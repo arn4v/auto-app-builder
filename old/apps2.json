@@ -1,0 +1,22 @@
+{
+      "app": "NewPipe",
+      "NewPipe": {
+	"repository": "TeamNewPipe/NewPipe",
+	"branch":  "master",
+	"tag": ""
+      }
+},
+      "app": "FairEmail",
+      "FairEmail": {
+      "repository": "M66B/FairEmail",
+      "branch":  "master",
+      "tag": ""
+      }
+},
+      "app": "AntennaPod",
+      "AntennaPod": {
+      "repository": "AntennaPod/AntennaPod",
+      "branch":  "master",
+      "tag": ""
+      }
+}
