@@ -16,8 +16,9 @@ for app in $(cat $app_list | jq -r .[].app); do
     apprepo=$(cat $app_list | jq -r .[].$app[]?.repository | head -n 1)
     appbranch=$(cat $app_list | jq -r .[].$app[]?.branch | head -n 1)
     tag=$(get_release_info $apprepo)
+    if [[ ! -d out ]]; then mkdir out fi
     if [[ ! -f tags.txt ]]; then
-        echo $app=$tag >> tags.txt
+        echo $app:$tag >> tags.txt
     else
     if [[ $(cat tags.txt | grep $app | sed 's/$app://') == $tag ]]; then
 		    Already built $app with $tag tag
