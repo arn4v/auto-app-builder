@@ -7,12 +7,6 @@ get_release_info() {
     curl --silent "https://api.github.com/repos/$1/tags" | jq -r '.[0].name'
 }
 
-APPS=(
-    'AntennaPod'
-    'NewPipe'
-    'FairEmail'
-)
-
 echo "Root Directory: $root_dir"
 echo "Working Directory: $working_dir"
 echo "Building $(cat $app_list | jq -r .[].app | xargs | sed 's/ /, /')"
@@ -37,9 +31,9 @@ for app in $(cat $app_list | jq -r .[].app); do
 	rm *zip
         cd $working_dir/*
         echo "sdk.dir=${ANDROID_SDK_PATH}" >> "local.properties"
-	echo "org.gradle.jvmargs=-Xmx1g" >> "gradle.properties"
+#	echo "org.gradle.jvmargs=-Xmx1g" >> "gradle.properties"
         ./gradlew clean build
-	mv $(find $working_dir/ -type f -name '*release*apk') $root_dir/out
+	mv $(find $working_dir/ -type f -name '*release*apk') $root_dir/out/$app-$tag-$(date +%Y%m%d_%H%M)-unsigned.apk
     fi
    fi
 done

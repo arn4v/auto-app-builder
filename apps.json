@@ -2,15 +2,53 @@
     "app": "NewPipe",
     "NewPipe": [{
       "repository": "TeamNewPipe/NewPipe",
+      "remote": "github",
       "branch": "master",
       "tag": ""
     }]
   },
   {
-    "app": "AntennaPod",
-    "AntennaPod": [{
-      "repository": "AntennaPod/AntennaPod",
+    "app": "primftp",
+    "primftp": [{
+      "repository": "wolpi/prim-ftpd",
+      "remote": "github",
       "branch": "master",
+      "tag": ""
+    }]
+  },
+  {
+    "app": "Librera",
+    "Librera": [{
+      "repository": "foobnix/LibreraReader",
+      "remote": "github",
+      "branch": "master",
+      "tag": ""
+    }]
+  },
+  {
+    "app": "Nextcloud",
+    "Nextcloud": [{
+      "repository": "nextcloud/android",
+      "remote": "github",
+      "branch": "master",
+      "tag": ""
+    }]
+  },
+  {
+    "app": "Slide",
+    "Slide": [{
+      "repository": "ccrama/Slide",
+      "remote": "github",
+      "branch": "master",
+      "tag": ""
+    }]
+  },
+  {
+    "app": "ProtonMail",
+    "ProtonMail": [{
+      "repository": "ProtonMail/proton-mail-android",
+      "remote": "github",
+      "branch": "release",
       "tag": ""
     }]
   }
