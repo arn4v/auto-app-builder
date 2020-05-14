@@ -1,0 +1,4 @@
+apps/*
+out/*
+.tags.ini
+apps.json
