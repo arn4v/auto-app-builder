@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 root_dir=$(pwd)
 working_dir=$root_dir/apps
-app_details=$root_dir/apps.json
+app_list=$root_dir/apps.json
 
 get_release_info() {
     curl --silent "https://api.github.com/repos/$1/tags" | jq -r '.[0].name'
@@ -15,11 +15,12 @@ APPS=(
 
 echo "Root Directory: $root_dir"
 echo "Working Directory: $working_dir"
+echo "Building $(cat $app_list | jq -r .[].app | xargs | sed 's/ /, /')"
 echo ""
 
-for app in "${APPS[@]}"; do
-    apprepo=$(cat $app_details | jq -r .$app.repository | head -n 1)
-    appbranch=$(cat $app_details | jq -r .$app.branch | head -n 1)
+for app in $(cat $app_list | jq -r .[].app); do
+    apprepo=$(cat $app_list | jq -r .[].$app[]?.repository | head -n 1)
+    appbranch=$(cat $app_list | jq -r .[].$app[]?.branch | head -n 1)
     tag=$(get_release_info $apprepo)
     if [[ ! -f tags.txt ]]; then
         echo $app=$tag >> tags.txt
