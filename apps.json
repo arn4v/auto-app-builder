@@ -17,27 +17,27 @@
     }]
   },
   {
-    "app": "Librera",
-    "Librera": [{
-      "repository": "foobnix/LibreraReader",
-      "remote": "github",
-      "branch": "master",
-      "tag": ""
-    }]
-  },
-  {
-    "app": "Nextcloud",
-    "Nextcloud": [{
-      "repository": "nextcloud/android",
-      "remote": "github",
-      "branch": "master",
-      "tag": ""
-    }]
-  },
-  {
     "app": "Slide",
     "Slide": [{
       "repository": "ccrama/Slide",
+      "remote": "github",
+      "branch": "master",
+      "tag": ""
+    }]
+  },
+  {
+    "app": "GeometricWeather",
+    "GeometricWeather": [{
+      "repository": "WangDaYeeeeee/GeometricWeather",
+      "remote": "github",
+      "branch": "master",
+      "tag": ""
+    }]
+  },
+  {
+    "app": "Voice",
+    "Voice": [{
+      "repository": "PaulWoitaschek/Voice",
       "remote": "github",
       "branch": "master",
       "tag": ""
@@ -50,6 +50,24 @@
       "remote": "github",
       "branch": "release",
       "tag": ""
+    }]
+  },
+  {
+    "app": "Librera",
+    "Librera": [{
+      "repository": "foobnix/LibreraReader",
+      "remote": "github",
+      "branch": "master",
+      "tag": ""
+    }]
+  },
+  {
+     "app": "Nextcloud",
+     "Nextcloud": [{
+     "repository": "nextcloud/android",
+     "remote": "github",
+     "branch": "master",
+     "tag": ""
     }]
   }
 ]
