@@ -32,31 +32,30 @@ for app in $(cat $app_list | jq -r .[].app); do
     if [[ ! -f .tags.ini ]]; then
 	touch .tags.ini
     fi
-    if [[ $(cat .tags.ini | grep $app | sed "s/$app:.*/$app/") == $app ]]; then
-    if [[ -f $(ls $root_dir/out/$app-$tag-*.apk) ]]; then
-#    if [[ $(cat .tags.ini | grep $app | sed "s/$app://") == $tag ]]; then
-	echo "Already built ${app} with the tag: ${tag}"
-	continue
-    else
-	echo "App: $app with release tag: $tag has not been built, building"
-    fi
-    else
-        echo "${app}:${tag}" >> .tags.ini
-	rm -rf $working_dir
-        mkdir $working_dir && cd $working_dir
-        echo "Downloading $app source"
-	echo " "
-        wget https://github.com/$apprepo/archive/$tag.zip
-        echo "Decompressing $app source"
-	echo " "
-        unzip *.zip
-	rm *zip
-        cd $working_dir/*
-        echo "sdk.dir=${ANDROID_SDK_PATH}" >> "local.properties"
-	echo "Building $app with tag: $tag sources"
-	echo " "
-	bash $root_dir/build.sh $app
-	for appfile in $(find $working_dir/ -type f -name '*unsigned*apk'); do mv -- $appfile $root_dir/out/"$app-$tag-$(date +%Y%m%d_%H%M)-$appfile"; done
-	killall -9 java && pkill -f '.*GradleDaemon.*'
+    if [[ ! $(cat .tags.ini | grep $app | sed "s/$app:.*/$app/") == $app ]]; then
+      if [[ $(cat tags.txt | grep $app | sed 's/$app://') == $tag ]]; then
+        if [[ ! -n $(ls $root_dir/out/$app-$tag-*.apk) ]]; then
+            echo "${app}:${tag}" >> .tags.ini
+            rm -rf $working_dir
+            mkdir $working_dir && cd $working_dir
+            echo "Downloading $app source"
+            echo " "
+            wget https://github.com/$apprepo/archive/$tag.zip
+            echo "Decompressing $app source"
+            echo " "
+            unzip *.zip
+            rm *zip
+            cd $working_dir/*
+            echo "sdk.dir=${ANDROID_SDK_PATH}" >> "local.properties"
+            echo "Building $app with tag: $tag sources"
+            echo " "
+            bash $root_dir/build.sh $app
+            for appfile in $(find $working_dir/ -type f -name '*unsigned*apk'); do mv -- $appfile $root_dir/out/"$app-$tag-$(date +%Y%m%d_%H%M)-$appfile"; done
+            killall -9 java && pkill -f '.*GradleDaemon.*'
+        else
+            echo "Already build $app with release tag $tag sources, continuing."
+            continue
+        fi
+      fi
     fi
 done
