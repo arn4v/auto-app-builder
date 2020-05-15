@@ -13,8 +13,13 @@ catch() {
     return $ex_code
 }
 
-if [[ $1 = "LibreraPro" ]]
-then
+if [[ $1 == "SmartPack" ]]; then
+else
+    sed -i 's/org.gradle.jvmargs=.*//' gradle.properties
+    echo "org.gradle.jvmargs=-Xmx3g -XX:MaxPermSize=2048m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> gradle.properties
+fi
+
+if [[ $1 == "LibreraPro" ]] ;then
     try
     touch ~/.gradle/gradle.properties
     echo "RELEASE_STORE_FILE=~/.keystores/myapps.pkcs12" >> ~/.gradle/gradle.properties
@@ -26,8 +31,8 @@ then
     ./gradlew clean assembleFdroid || echo "Failed"
     }
     rm ~/.gradle/gradle.properties
-elif [[ $1 = "AntennaPod" ]]
-then
+elif [[ $1 == "AntennaPod" ]]; then
+    try
     echo "releaseStoreFile=$keystoreFile" >> gradle.properties
     echo "releaseStorePassword=$keystorePassword" >> gradle.properties
     echo "releaseKeyAlias=$keystoreAlias" >> gradle.properties
@@ -35,7 +40,13 @@ then
     catch || {
     ./gradlew clean build || echo "Failed"
     }
+elif [[ $1 == "SmartPack" ]]; then
+    try
+    catch || {
+    ./gradlew clean build || echo "Failed"
+    }
 else
+    try
     catch || {
     ./gradlew clean build || echo "Failed"
     }

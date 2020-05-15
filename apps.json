@@ -8,6 +8,15 @@
     }]
   },
   {
+    "app": "SmartPack",
+    "SmartPack": [{
+      "repository": "SmartPack/SmartPack-Kernel-Manager",
+      "remote": "github",
+      "branch": "master",
+      "tag": ""
+    }]
+  },
+  {
     "app": "primftp",
     "primftp": [{
       "repository": "wolpi/prim-ftpd",

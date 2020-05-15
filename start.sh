@@ -4,7 +4,6 @@ working_dir=$root_dir/apps
 app_list=$root_dir/apps.json
 
 get_release_info() {
-#    curl --silent "https://api.github.com/repos/$1/tags" | jq -r '.[0].name'
     curl --silent "https://api.github.com/repos/$1/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")'
 }
 
@@ -21,7 +20,8 @@ catch() {
 
 echo "Root Directory: $root_dir"
 echo "Working Directory: $working_dir"
-printf "\nBuilding $(cat $app_list | jq -r .[].app)\n"
+printf "Building:\n$(cat $app_list | jq -r .[].app)"
+echo " "
 
 for app in $(cat $app_list | jq -r .[].app); do
     try
@@ -29,26 +29,34 @@ for app in $(cat $app_list | jq -r .[].app); do
     appbranch=$(cat $app_list | jq -r .[].$app[]?.branch | head -n 1)
     tag=$(get_release_info $apprepo)
     if [[ ! -d out ]]; then mkdir out; fi
-    if [[ ! -f tags.txt ]]; then
-        echo $app:$tag >> tags.txt
+    if [[ ! -f .tags.ini ]]; then
+	touch .tags.ini
+    fi
+    if [[ $(cat .tags.ini | grep $app | sed "s/$app:.*/$app/") == $app ]]; then
+    if [[ -f $(ls $root_dir/out/$app-$tag-*.apk) ]]; then
+#    if [[ $(cat .tags.ini | grep $app | sed "s/$app://") == $tag ]]; then
+	echo "Already built ${app} with the tag: ${tag}"
+	continue
     else
-    if [[ $(cat tags.txt | grep $app | sed 's/$app://') == $tag ]]; then
-		    Already built $app with $tag tag
+	echo "App: $app with release tag: $tag has not been built, building"
+    fi
     else
+        echo "${app}:${tag}" >> .tags.ini
 	rm -rf $working_dir
         mkdir $working_dir && cd $working_dir
         echo "Downloading $app source"
+	echo " "
         wget https://github.com/$apprepo/archive/$tag.zip
         echo "Decompressing $app source"
+	echo " "
         unzip *.zip
 	rm *zip
         cd $working_dir/*
-	sed -i 's/org.gradle.jvmargs=.*//' gradle.properties
         echo "sdk.dir=${ANDROID_SDK_PATH}" >> "local.properties"
-        echo "org.gradle.jvmargs=-Xmx3g -XX:MaxPermSize=2048m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> gradle.properties
+	echo "Building $app with tag: $tag sources"
+	echo " "
 	bash $root_dir/build.sh $app
-	mv $(find $working_dir/ -type f -name '*debug*apk') $root_dir/out/$app-$tag-$(date +%Y%m%d_%H%M)-unsigned.apk
+	for appfile in $(find $working_dir/ -type f -name '*unsigned*apk'); do mv -- $appfile $root_dir/out/"$app-$tag-$(date +%Y%m%d_%H%M)-$appfile"; done
 	killall -9 java && pkill -f '.*GradleDaemon.*'
     fi
-   fi
 done
