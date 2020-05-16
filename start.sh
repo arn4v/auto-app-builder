@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 root_dir=$(pwd)
 working_dir=$root_dir/apps
+out_dir=$root_dir/out
 app_list=$root_dir/apps.json
 
 get_release_info() {
@@ -30,11 +31,11 @@ for app in $(cat $app_list | jq -r .[].app); do
     tag=$(get_release_info $apprepo)
     if [[ ! -d out ]]; then mkdir out; fi
     if [[ ! -f .tags.ini ]]; then touch .tags.ini; fi
-    if [[ $(cat .tags.ini | grep $app | sed "s/${app}.*/${app}/") == $app ]] && [[ $(cat .tags.ini | grep $app | sed "s/${app}://") == $tag ]] && [[ $(test -n "$(find $root_dir/out -type f -name $app-$tag-*.apk)" | head -c1 | wc -c) -ne 0 ]]; then
+    if [[ $(cat .tags.ini | grep $app | sed "s/${app}.*/${app}/") == $app ]] && [[ $(cat .tags.ini | grep $app | sed "s/${app}://") == $tag ]] && [[ -d "$out_dir/$app-$tag-$(date +%Y%m%d)" ]] && [[ $(ls "$out_dir/$app-$tag-$(date +%Y%m%d)" | head -c1 | wc -c) -ne 0 ]]; then
         echo "Already build $app with release tag $tag sources, continuing."
         continue
     else
-	sed -i "s/${app}.*//" .tags.ini
+	if [[ $(cat .tags.ini | grep $app | head -c1 | wc -c) -ne 0 ]]; then sed -i "s/${app}.*//" .tags.ini; fi
 	echo "$app:$tag" >> .tags.ini
 	rm -rf $working_dir
 	mkdir $working_dir && cd $working_dir
@@ -50,7 +51,10 @@ for app in $(cat $app_list | jq -r .[].app); do
 	echo "Building $app with tag: $tag sources"
 	echo " "
 	bash $root_dir/build.sh $app
-	for appfile in $(find $working_dir/ -type f -name '*unsigned*apk'); do mv -- $appfile $root_dir/out/"$app-$tag-$(date +%Y%m%d_%H%M)-$appfile"; done
-	killall -9 java && pkill -f '.*GradleDaemon.*'
+        if [[ ! -d "$out_dir/$app-$tag-$(date +%Y%m%d)" ]]; then mkdir $out_dir/$app-$tag-$(date +%Y%m%d); fi
+	find $working_dir/ -iname '*unsigned*.apk' -exec mv {} $out_dir/$app-$tag-$(date +%Y%m%d) \;
+        ls $out_dir/$app-$tag-$(date +%Y%m%d)/ | xargs -I {} mv {} $app-$tag-$(date +%Y%m%d_%H%M)_{}
+        killall -9 java && pkill -f '.*GradleDaemon.*'
+	cd $root_dir
     fi
 done
