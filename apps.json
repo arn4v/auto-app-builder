@@ -69,14 +69,5 @@
       "branch": "master",
       "tag": ""
     }]
-  },
-  {
-     "app": "Nextcloud",
-     "Nextcloud": [{
-     "repository": "nextcloud/android",
-     "remote": "github",
-     "branch": "master",
-     "tag": ""
-    }]
   }
 ]

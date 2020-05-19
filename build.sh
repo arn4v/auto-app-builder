@@ -10,22 +10,9 @@
 # keystoreAlias=
 # keyPassword=
 
-try() {
-    [[ $- = *e* ]]; SAVED_OPT_E=$?
-    set +e
-}
-
-catch() {
-    export ex_code=$?
-    (( $SAVED_OPT_E )) && set +e
-    return $ex_code
-}
-
 if [[ ! $1 == "SmartPack" ]]; then
     sed -i 's/org.gradle.jvmargs=.*//' gradle.properties
     echo "org.gradle.jvmargs=-Xmx3g -XX:MaxPermSize=2048m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8" >> gradle.properties
-else
-    echo "Nothing to do here"
 fi
 
 if [[ $1 == "LibreraPro" ]] ;then
@@ -42,9 +29,9 @@ elif [[ $1 == "AntennaPod" ]]; then
     echo "releaseStorePassword=$keystorePassword" >> gradle.properties
     echo "releaseKeyAlias=$keystoreAlias" >> gradle.properties
     echo "releaseKeyPassword=$keystorePassword" >> gradle.properties
-    ./gradlew clean build || echo "Failed"
+    ./gradlew clean assembleRelease || echo "Failed"
 elif [[ $1 == "SmartPack" ]]; then
-    ./gradlew clean build || echo "Failed"
+    ./gradlew clean assembleRelease || echo "Failed"
 else
-    ./gradlew clean build || echo "Failed"
+    ./gradlew clean assembleRelease || echo "Failed"
 fi
