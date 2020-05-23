@@ -10,9 +10,6 @@
 # keystoreAlias=
 # keyPassword=
 
-root_dir="$(pwd)/../.."
-. "local.properties"
-
 if [[ $1 == "LibreraPro" ]] ;then
     echo "RELEASE_STORE_FILE=~/.keystores/myapps.pkcs12" >> ~/.gradle/gradle.properties
     echo "RELEASE_STORE_PASSWORD=$keystorePassword" >> ~/.gradle/gradle.properties

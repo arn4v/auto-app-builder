@@ -3,14 +3,14 @@
 # SPDX-License-Identifier: GNU General Public License v3.0 only
 
 root_dir=$(pwd)
-. "local.properties"
+source local.properties
+killall -9 java && pkill -f '.*GradleDaemon.*'
 
 get_release_info() {
     curl --silent "https://api.github.com/repos/$1/releases/latest" | grep -Po '"tag_name": "\K.*?(?=")'
 }
 
-usage()
-{
+usage() {
   echo "Welcome to lazy builder!"
   echo "A bash script to help you automate building your favourite foss apps for your own usage, signed with your own keys!"
   echo -e "\t-h | --help"
@@ -25,8 +25,22 @@ sign_align() {
 }
 
 add_param() {
-    jq_command="jq '.[].$2 += {"${3}":"${4}"}' > $app_list"
-    sh -c "$jq_command"
+    echo "Enter the name of the app:"
+    read app
+    echo "Enter app repo in the format <Github Username>/<repository name>:"
+    read apprepo
+    echo "Enter the branch (default:master):"
+    read branch
+    if [[ -z $branch ]]; then branch=master; fi
+#    jq --arg a "$app" --arg repo "$apprepo" --arg b "$branch" '.[]. + { app: $a {($a): [{"app": $a, "apprepo": $repo, "branch": $b}}] },' "$app_list"
+#jq '.[].$2 += {"${3}":"${4}"}' > $app_list
+    jq '
+    .[env.app] = {
+       app:    env.app,
+       repository: env.apprepo,
+       branch:    env.branch
+    }
+    ' "$app_list"
 }
 
 build() {
@@ -46,22 +60,22 @@ build() {
     echo " "
     unzip "$app-$tag.zip"
     rm "$app-$tag.zip"
-    echo "sdk.dir=${ANDROID_SDK_PATH}" >> "local.properties"
     echo "Building $app with tag: $tag sources"
     echo " "
-    cd $working_dir/*
+    cd $working_dir/$app*
+    echo "sdk.dir=${ANDROID_SDK_PATH}" >> "local.properties"
     bash $root_dir/app-rules.sh $app
     ./gradlew clean build
-    if [[ -z $(find $app_working_dir -type -f name '*apk' | head -c 1 | wc -c) ]]; then
-        rm -rf $app_out_dir
-        echo "Build for $app failed, please read the error above"
-        exit 1
-    else
+    if [[ $(find $app_working_dir -type -f name '*apk' | head -n 1 | wc -c) -ne 0 ]]; then
         if [[ ! -d $app_out_dir ]]; then mkdir $app_out_dir; fi
         find $app_working_dir -type f -name '*unsigned*.apk' -exec mv {} $2/ \;
         ls $app_out_dir/ | xargs -I {} mv {} $app-$tag-$(date +%Y%m%d_%H%M)_{}
         if [[ $SIGN_APP -ne 0 ]]; then sign_align; fi
         killall -9 java && pkill -f '.*GradleDaemon.*'
+    else
+        rm -rf $app_out_dir
+        echo "Build for $app failed, please read the error above"
+        continue
     fi
     cd $root_dir
 }
@@ -100,10 +114,6 @@ buildapp() {
     exit 1
 }
 
-#addparam() {
-#}
-
-
 while [[ $# -gt 0 ]]
 do
   key="$1"
@@ -112,8 +122,8 @@ do
       usage
       exit
       ;;
-    -a|--add-aram)
-      add_param $2 $3 $4
+    -a|--add-param)
+      add_param
       ;;
     -s|--sign)
      SIGN_APP=1
