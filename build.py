@@ -4,6 +4,7 @@
 
 import argparse
 import datetime
+import glob
 import json
 import os
 import platform
@@ -11,7 +12,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
-import urllib
+import urllib.request
 
 # from bs4 import BeautifulSoup
 from pathlib import Path
@@ -26,12 +27,13 @@ if platform.system() == "Windows":
     warning = textwrap.dedent(
         """\n
     ******************* WARNING ******************
-    Some apps might not have gradlew.bat, please 
-    consider using WSL to run this script
+    Some apps might not have gradlew.bat script, 
+    please consider using WSL on Windows.
     **********************************************
     """
     )
     print(warning)
+    sys.exit()
 
 
 def parse_arguments():
@@ -75,13 +77,21 @@ def setup():
     """
     Check if working directory exists and create it if it doesn't
     """
-    if os.path.isdir(working_dir) == False:
+    if os.path.isdir(working_dir):
+        # os.chmod(working_dir, stat.S_IWUSR)
+        # shutil.rmtree(working_dir)
+        os.system(f"rm -rf {working_dir}")
+        os.mkdir(working_dir)
+    else:
         os.mkdir(working_dir)
 
     if os.path.isdir(bin_dir) == False:
         os.mkdir(bin_dir)
 
-    if os.path.isdir(out_dir) == False:
+    if os.path.isdir(out_dir):
+        shutil.rmtree(out_dir, ignore_errors=True)
+        os.mkdir(out_dir)
+    else:
         os.mkdir(out_dir)
 
     if os.path.isfile(apps_json) == False:
@@ -114,7 +124,6 @@ def info_from_user():
 
 
 def get_info_from_json(name):
-    name = name.lower
     db = open(apps_json, mode="r")
     db_data = json.load(db)
     db.close()
@@ -133,36 +142,57 @@ def get_total():
     return [app_list, total]
 
 
-def dl_gh_source(app, repo):
-    app_dir = f"{working_dir}/{app}-{latest_tag}"
+def get_tag(repo):
     gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
     latest_tag = json.load(urllib.request.urlopen(gh_tag))
     latest_tag = latest_tag["tag_name"]
+    return latest_tag
+
+
+def dl_gh_source(name, repo):
+    latest_tag = get_tag(repo)
+    tarball_name = f"{working_dir}/{name}.tar.gz"
     gh_dl = f"https://github.com/{repo}/archive/{latest_tag}.tar.gz"
-    urllib.request.urlretrieve(gh_dl, f"{working_dir}/{app_dir}.tar.gz")
+    urllib.request.urlretrieve(gh_dl, tarball_name)
+
+    shutil.unpack_archive(
+        filename=f"{working_dir}/{name}.tar.gz",
+        extract_dir=f"{working_dir}",
+        format="gztar",
+    )
+
+    os.remove(f"{working_dir}/{name}.tar.gz")
     os.chdir(root_dir)
-    os.system(f"tar -xzf {working_dir}/{app_dir}.tar.gz")
-    os.remove(f"{working_dir}/{app_dir}.tar.gz")
 
 
 def dl_gitlab_source(name, repo, branch):
-    app_dir = f"{working_dir}/{app}-{latest_tag}"
+    app_dir = f"{working_dir}/{name}"
     clonecmd = f"git clone git://gitlab.com/{repo} -b {branch} --depth 1 {app_dir}"
-    os.chdir(working_dir)
     os.system(clonecmd)
 
 
 def build(name):
     setup()
-    app_dir = f"{working_dir}/{app}-{latest_tag}"
     repo = get_info_from_json(name)[0]
     branch = get_info_from_json(name)[1]
     remote = get_info_from_json(name)[2]
+    latest_tag = get_tag(repo).replace("v", "", 1)
+    app_dir = f"{working_dir}/{name}"
+    app_working_dir = f"{working_dir}/{name}-{latest_tag}"
+
     if remote == "github":
         dl_gh_source(name, repo)
     elif remote == "gitlab":
         dl_gitlab_source(name, repo, branch)
-    os.system(f"{working_dir}")
+
+    if platform.system == "Windows":
+        if os.path.isfile(f"{app_working_dir}/gradlew.bat"):
+            os.system(f'"{app_working_dir}/gradlew.bat" assembleRelease')
+        else:
+            print("gradlew batch script does not exist, exiting")
+            sys.exit
+    else:
+        os.system(f"bash {app_working_dir}/gradlew assembleRelease")
 
 
 def build_all():
