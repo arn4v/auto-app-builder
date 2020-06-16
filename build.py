@@ -10,6 +10,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import textwrap
 import urllib
 
 # from bs4 import BeautifulSoup
@@ -27,10 +28,10 @@ def parse_arguments():
     Arguments to be passed into the script
     """
     parser = argparse.ArgumentParser(
-        description="Build and sign your favourite FOSS Android Apps with your own keystore!"
+        description="Build and sign your favourite FOSS Android Apps with your own keystore!",
+        prefix_chars="--",
     )
     parser.add_argument(
-        "-b",
         "--build",
         metavar="<app-name>",
         default=None,
@@ -38,20 +39,16 @@ def parse_arguments():
         type=str,
     )
     parser.add_argument(
-        "-ba",
-        "--build-all",
-        action="store_false",
-        default=False,
-        help="Builds all app specified in json",
+        "--build-all", action="store_true", help="Builds all app specified in json",
     )
     parser.add_argument(
         "--fdroid",
-        action="store_false",
+        action="store_true",
         help="Takes application specifics input form user and stores in a JSON file",
     )
     parser.add_argument(
         "--add-app",
-        action="store_false",
+        action="store_true",
         help="Takes application specifics input form user and stores in a JSON file",
     )
     parser.add_argument(
@@ -126,10 +123,10 @@ def get_total():
 
 
 def dl_gh_source(app, repo):
+    app_dir = f"{working_dir}/{app}-{latest_tag}"
     gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
     latest_tag = json.load(urllib.request.urlopen(gh_tag))
     latest_tag = latest_tag["tag_name"]
-    app_dir = f"{app}-{latest_tag}"
     gh_dl = f"https://github.com/{repo}/archive/{latest_tag}.tar.gz"
     urllib.request.urlretrieve(gh_dl, f"{working_dir}/{app_dir}.tar.gz")
     os.chdir(root_dir)
@@ -138,13 +135,15 @@ def dl_gh_source(app, repo):
 
 
 def dl_gitlab_source(name, repo, branch):
-    clonecmd = f"git clone git://gitlab.com/{repo} -b {branch} --depth 1"
+    app_dir = f"{working_dir}/{app}-{latest_tag}"
+    clonecmd = f"git clone git://gitlab.com/{repo} -b {branch} --depth 1 {app_dir}"
     os.chdir(working_dir)
     os.system(clonecmd)
 
 
 def build(name):
     setup()
+    app_dir = f"{working_dir}/{app}-{latest_tag}"
     repo = get_info_from_json(name)[0]
     branch = get_info_from_json(name)[1]
     remote = get_info_from_json(name)[2]
@@ -152,6 +151,7 @@ def build(name):
         dl_gh_source(name, repo)
     elif remote == "gitlab":
         dl_gitlab_source(name, repo, branch)
+    os.system(f"{working_dir}")
 
 
 def build_all():
@@ -163,13 +163,13 @@ def build_all():
 def main():
     args = parse_arguments()
 
-    if args.add_app:
-        info_from_user()
-    elif args.add_app and args.fdroid:
-        info_from_fdroid(args.add_app)
-    elif args.add_app and args.fdroid and args.from_file:
+    if args.add_app and args.fdroid and args.from_file:
         for apps in args.from_file:
             info_from_fdroid(apps)
+    elif args.add_app and args.fdroid:
+        info_from_fdroid(args.add_app)
+    elif args.add_app:
+        info_from_user()
 
     if args.build is not None:
         build(args.build)

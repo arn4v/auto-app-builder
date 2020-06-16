@@ -1,4 +1,4 @@
 apps/*
 out/*
-tags.ini
+tags.json
 apps.json
