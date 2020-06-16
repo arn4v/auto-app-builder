@@ -22,6 +22,17 @@ bin_dir = f"{root_dir}/bin"
 out_dir = f"{root_dir}/out"
 apps_json = f"{root_dir}/apps.json"
 
+if platform.system() == "Windows":
+    warning = textwrap.dedent(
+        """\n
+    ******************* WARNING ******************
+    Some apps might not have gradlew.bat, please 
+    consider using WSL to run this script
+    **********************************************
+    """
+    )
+    print(warning)
+
 
 def parse_arguments():
     """
