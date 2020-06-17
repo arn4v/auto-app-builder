@@ -8,8 +8,10 @@ import datetime
 import glob
 import json
 import os
+import pathlib
 import platform
 import requests
+import shlex
 import shutil
 import subprocess
 import sys
@@ -20,21 +22,38 @@ import urllib.request
 from pathlib import Path
 
 root_dir = os.getcwd()
-working_dir = f"{root_dir}/working"
-bin_dir = f"{root_dir}/bin"
-out_dir = f"{root_dir}/out"
-apps_json = f"{root_dir}/apps.json"
+working_dir = os.path.join(root_dir, "working")
+bin_dir = os.path.join(root_dir, "bin")
+out_dir = os.path.join(root_dir, "out")
+apps_json = os.path.join(root_dir, "apps.json")
 
-if platform.system() == "Windows":
-    warning = textwrap.dedent(
-        """\n
-    ******************* WARNING ******************
-    Some apps might not have gradlew.bat script,
-    please consider using WSL on Windows.
-    **********************************************
-    """
-    )
-    print(warning)
+
+def check_platform():
+    if platform.system() == "Windows":
+        warning = textwrap.dedent(
+            """\n
+        ******************* WARNING ******************
+        Some apps might not have gradlew.bat script,
+        please consider using WSL on Windows.
+        **********************************************
+        """
+        )
+        print(warning)
+        sys.exit()
+
+
+def check_net():
+    try:
+        response = urllib.request.urlopen("https://www.google.com/", timeout=10)
+        return True
+    except:
+        return False
+
+
+check_platform()
+
+if check_net() == False:
+    print("Please check your internet connection and try again.")
     sys.exit()
 
 
@@ -44,7 +63,7 @@ def parse_arguments():
     """
     parser = argparse.ArgumentParser(
         description="Build and sign your favourite FOSS Android Apps with your own keystore!",
-        prefix_chars="--",
+        # prefix_chars="--",
     )
     parser.add_argument(
         "--build", default=None, metavar="APP", help="Builds specified app", type=str,
@@ -64,7 +83,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--from-file",
-        metavar='FILE',
+        metavar="FILE",
         type=argparse.FileType("r"),
         help="Takes application names from text file, finds specifics from F-Droid and stores it in a new or prexisting JSON file.",
     )
@@ -77,7 +96,7 @@ def setup():
     Check if working directory exists and create it if it doesn't
     """
     if os.path.isdir(working_dir):
-        os.chmod(working_dir, stat.S_IWUSR)
+        os.chmod(working_dir, 0o755)
         shutil.rmtree(working_dir)
         # os.system(f"rm -rf {working_dir}")
         os.mkdir(working_dir)
@@ -150,7 +169,7 @@ def get_tag(repo):
 
 def dl_gh_source(name, repo):
     latest_tag = get_tag(repo)
-    tarball_name = f"{working_dir}/{name}.tar.gz"
+    tarball_name = os.path.join(working_dir, f"{name}.tar.gz")
     gh_dl = f"https://github.com/{repo}/archive/{latest_tag}.tar.gz"
     urllib.request.urlretrieve(gh_dl, tarball_name)
 
@@ -177,22 +196,41 @@ def dl_gitlab_source(name, repo, branch):
     clonecmd = f"git clone git://gitlab.com/{repo} -b {branch} --depth 1 {app_dir}"
     os.system(clonecmd)
 
+
 def build(name):
     setup()
+
+    print(f"Fetching {name} information from db...\n")
+
     repo = get_info_from_json(name)[0]
     branch = get_info_from_json(name)[1]
     remote = get_info_from_json(name)[2]
     latest_tag = get_tag(repo).replace("v", "", 1)
-    app_working_dir = f"{working_dir}/{name}-{latest_tag}"
-    gradlew = "./" + app_working_dir + "/gradlew"
+    app_working_dir = os.path.join(working_dir, f"{name}-{latest_tag}")
 
     if remote == "github":
+        print("Download source from GitHub...\n")
         dl_gh_source(name, repo)
     elif remote == "gitlab":
+        print("Download source from Gitlab...\n")
         dl_gitlab_source(name, repo, branch)
 
-    # os.system(f"./{app_working_dir}/gradlew assembleRelease")
-    subprocess.check_call(gradlew, "clean", "build")
+    print(f"Building {name}...")
+
+    os.chdir(app_working_dir)
+    subprocess.check_call(shlex.split("./gradlew clean build"))
+    copy_build(name)
+
+
+def copy_build(name):
+    date = datetime.date.today()
+    app_out_dir = f"{out_dir}/{name}-{date}"
+    unsigned_apk_name = f"{name}-{date}-unsigned.apk"
+    dest = os.path.join(app_out_dir, unsigned_apk_name)
+    os.mkdir(app_out_dir)
+    releaseapk = str(list(pathlib.Path(working_dir).rglob("*release*.apk"))[0])
+    print(releaseapk)
+    shutil.copyfile(releaseapk, dest)
 
 
 def build_all():
