@@ -1,4 +1,5 @@
-apps/*
+.vscode/
+working/*
 out/*
 tags.json
 apps.json
