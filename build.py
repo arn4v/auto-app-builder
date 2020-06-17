@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 # Copyright (C) 2020 Arnav Gosain
 # SPDX-License-Identifier: GPL-3.0-only
 
@@ -8,6 +9,7 @@ import glob
 import json
 import os
 import platform
+import requests
 import shutil
 import subprocess
 import sys
@@ -27,7 +29,7 @@ if platform.system() == "Windows":
     warning = textwrap.dedent(
         """\n
     ******************* WARNING ******************
-    Some apps might not have gradlew.bat script, 
+    Some apps might not have gradlew.bat script,
     please consider using WSL on Windows.
     **********************************************
     """
@@ -45,11 +47,7 @@ def parse_arguments():
         prefix_chars="--",
     )
     parser.add_argument(
-        "--build",
-        metavar="<app-name>",
-        default=None,
-        help="Builds specified app",
-        type=str,
+        "--build", default=None, metavar="APP", help="Builds specified app", type=str,
     )
     parser.add_argument(
         "--build-all", action="store_true", help="Builds all app specified in json",
@@ -66,11 +64,12 @@ def parse_arguments():
     )
     parser.add_argument(
         "--from-file",
+        metavar='FILE',
         type=argparse.FileType("r"),
         help="Takes application names from text file, finds specifics from F-Droid and stores it in a new or prexisting JSON file.",
     )
     parser.add_argument("--clean", action="store_false", help="Clean out directory.")
-    return parser.parse_args()
+    return parser
 
 
 def setup():
@@ -78,9 +77,9 @@ def setup():
     Check if working directory exists and create it if it doesn't
     """
     if os.path.isdir(working_dir):
-        # os.chmod(working_dir, stat.S_IWUSR)
-        # shutil.rmtree(working_dir)
-        os.system(f"rm -rf {working_dir}")
+        os.chmod(working_dir, stat.S_IWUSR)
+        shutil.rmtree(working_dir)
+        # os.system(f"rm -rf {working_dir}")
         os.mkdir(working_dir)
     else:
         os.mkdir(working_dir)
@@ -155,12 +154,20 @@ def dl_gh_source(name, repo):
     gh_dl = f"https://github.com/{repo}/archive/{latest_tag}.tar.gz"
     urllib.request.urlretrieve(gh_dl, tarball_name)
 
+    tarball = requests.get(gh_dl, stream=True)
+    tarball.raise_for_status()
+
+    with open(tarball_name, "wb") as handle:
+        for block in tarball.iter_content(1024):
+            handle.write(block)
+
     shutil.unpack_archive(
         filename=f"{working_dir}/{name}.tar.gz",
         extract_dir=f"{working_dir}",
         format="gztar",
     )
 
+    # os.system(f"tar -xzf {tarball_name}")
     os.remove(f"{working_dir}/{name}.tar.gz")
     os.chdir(root_dir)
 
@@ -170,29 +177,22 @@ def dl_gitlab_source(name, repo, branch):
     clonecmd = f"git clone git://gitlab.com/{repo} -b {branch} --depth 1 {app_dir}"
     os.system(clonecmd)
 
-
 def build(name):
     setup()
     repo = get_info_from_json(name)[0]
     branch = get_info_from_json(name)[1]
     remote = get_info_from_json(name)[2]
     latest_tag = get_tag(repo).replace("v", "", 1)
-    app_dir = f"{working_dir}/{name}"
     app_working_dir = f"{working_dir}/{name}-{latest_tag}"
+    gradlew = "./" + app_working_dir + "/gradlew"
 
     if remote == "github":
         dl_gh_source(name, repo)
     elif remote == "gitlab":
         dl_gitlab_source(name, repo, branch)
 
-    if platform.system == "Windows":
-        if os.path.isfile(f"{app_working_dir}/gradlew.bat"):
-            os.system(f'"{app_working_dir}/gradlew.bat" assembleRelease')
-        else:
-            print("gradlew batch script does not exist, exiting")
-            sys.exit
-    else:
-        os.system(f"bash {app_working_dir}/gradlew assembleRelease")
+    # os.system(f"./{app_working_dir}/gradlew assembleRelease")
+    subprocess.check_call(gradlew, "clean", "build")
 
 
 def build_all():
@@ -202,21 +202,24 @@ def build_all():
 
 
 def main():
-    args = parse_arguments()
+    args = parse_arguments().parse_args()
+    if len(sys.argv) < 2:
+        parse_arguments().print_usage()
+        sys.exit(1)
+    else:
+        if args.add_app and args.fdroid and args.from_file:
+            for apps in args.from_file:
+                info_from_fdroid(apps)
+        elif args.add_app and args.fdroid:
+            info_from_fdroid(args.add_app)
+        elif args.add_app:
+            info_from_user()
 
-    if args.add_app and args.fdroid and args.from_file:
-        for apps in args.from_file:
-            info_from_fdroid(apps)
-    elif args.add_app and args.fdroid:
-        info_from_fdroid(args.add_app)
-    elif args.add_app:
-        info_from_user()
+        if args.build is not None:
+            build(args.build)
 
-    if args.build is not None:
-        build(args.build)
-
-    if args.build_all is not False:
-        build_all()
+        if args.build_all is not False:
+            build_all()
 
 
 if __name__ == "__main__":
