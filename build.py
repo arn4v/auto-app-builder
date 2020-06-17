@@ -28,42 +28,12 @@ out_dir = os.path.join(root_dir, "out")
 apps_json = os.path.join(root_dir, "apps.json")
 
 
-def check_platform():
-    if platform.system() == "Windows":
-        warning = textwrap.dedent(
-            """\n
-        ******************* WARNING ******************
-        Some apps might not have gradlew.bat script,
-        please consider using WSL on Windows.
-        **********************************************
-        """
-        )
-        print(warning)
-        sys.exit()
-
-
-def check_net():
-    try:
-        response = urllib.request.urlopen("https://www.google.com/", timeout=10)
-        return True
-    except:
-        return False
-
-
-check_platform()
-
-if check_net() == False:
-    print("Please check your internet connection and try again.")
-    sys.exit()
-
-
 def parse_arguments():
     """
     Arguments to be passed into the script
     """
     parser = argparse.ArgumentParser(
         description="Build and sign your favourite FOSS Android Apps with your own keystore!",
-        # prefix_chars="--",
     )
     parser.add_argument(
         "--build", default=None, metavar="APP", help="Builds specified app", type=str,
@@ -117,28 +87,50 @@ def setup():
             db.close()
 
 
-def info_from_fdroid(name):
-    return "This will eventually fetch relevant information from F-Droid."
+def check_platform():
+    if platform.system() == "Windows":
+        warning = textwrap.dedent(
+            """\n
+        ******************* WARNING ******************
+        Some apps might not have gradlew.bat script,
+        please consider using WSL on Windows.
+        **********************************************
+        """
+        )
+        print(warning)
+        sys.exit()
 
 
-def parse_to_json(name, branch, repo):
-    setup()
-    new_app = {
-        "app": name,
-        name: [{"repository": repo, "remote": repo, "branch": branch,}],
-    }
-    with open(apps_json, "w+", encoding="utf-8") as db:
-        dblist = db.readlines()
-        dblist = dblist.append(new_app)
-        db.writelines(dblist)
+def check_net():
+    try:
+        response = urllib.request.urlopen("https://www.google.com/", timeout=10)
+        return True
+    except:
+        return False
 
 
-def info_from_user():
-    print("Please enter app specifics: \n")
-    name = input("Enter app name: \n").lower
-    branch = input("Enter branch to use: \n").lower
-    repo = input("Enter git URL \n").lower
-    parse_to_json(name, branch, repo)
+# TODO: Use Selenium To Fetch Info From F-Droid
+# def info_from_fdroid(name):
+#     return "This will eventually fetch relevant information from F-Droid."
+
+# TODO
+# def parse_to_json(name, branch, repo):
+#     setup()
+#     new_app = {
+#         "app": name,
+#         name: [{"repository": repo, "remote": repo, "branch": branch,}],
+#     }
+#     with open(apps_json, "w+", encoding="utf-8") as db:
+#         dblist = db.readlines()
+#         dblist = dblist.append(new_app)
+#         db.writelines(dblist)
+
+# def info_from_user():
+#     print("Please enter app specifics: \n")
+#     name = input("Enter app name: \n").lower
+#     branch = input("Enter branch to use: \n").lower
+#     repo = input("Enter git URL \n").lower
+#     parse_to_json(name, branch, repo)
 
 
 def get_info_from_json(name):
@@ -186,14 +178,15 @@ def dl_gh_source(name, repo):
         format="gztar",
     )
 
-    # os.system(f"tar -xzf {tarball_name}")
     os.remove(f"{working_dir}/{name}.tar.gz")
     os.chdir(root_dir)
 
 
 def dl_gitlab_source(name, repo, branch):
-    app_dir = f"{working_dir}/{name}"
-    clonecmd = f"git clone git://gitlab.com/{repo} -b {branch} --depth 1 {app_dir}"
+    app_working_dir = os.path.join(working_dir, f"{name}-{latest_tag}")
+    clonecmd = (
+        f"git clone git://gitlab.com/{repo} -b {branch} --depth 1 {app_working_dir}"
+    )
     os.system(clonecmd)
 
 
@@ -261,4 +254,10 @@ def main():
 
 
 if __name__ == "__main__":
+    check_platform()
+
+    if check_net() == False:
+        print("Please check your internet connection and try again.")
+        sys.exit()
+
     main()
