@@ -5,27 +5,25 @@
 
 import argparse
 import datetime
-import glob
 import json
 import os
 import pathlib
 import platform
-import requests
 import shlex
 import shutil
 import subprocess
 import sys
 import textwrap
-import urllib.request
-
-# from bs4 import BeautifulSoup
-from pathlib import Path
+import requests
 
 root_dir = os.getcwd()
 working_dir = os.path.join(root_dir, "working")
 bin_dir = os.path.join(root_dir, "bin")
 out_dir = os.path.join(root_dir, "out")
 apps_json = os.path.join(root_dir, "apps.json")
+db = open(apps_json, mode="r")
+db_data = json.load(db)
+db.close()
 
 
 def parse_arguments():
@@ -68,7 +66,6 @@ def setup():
     if os.path.isdir(working_dir):
         os.chmod(working_dir, 0o755)
         shutil.rmtree(working_dir)
-        # os.system(f"rm -rf {working_dir}")
         os.mkdir(working_dir)
     else:
         os.mkdir(working_dir)
@@ -77,7 +74,7 @@ def setup():
         os.mkdir(bin_dir)
 
     if os.path.isdir(out_dir):
-        shutil.rmtree(out_dir, ignore_errors=True)
+        shutil.rmtree(out_dir)
         os.mkdir(out_dir)
     else:
         os.mkdir(out_dir)
@@ -103,7 +100,7 @@ def check_platform():
 
 def check_net():
     try:
-        response = urllib.request.urlopen("https://www.google.com/", timeout=10)
+        response = requests.get("https://www.google.com/", timeout=10)
         return True
     except:
         return False
@@ -134,28 +131,19 @@ def check_net():
 
 
 def get_info_from_json(name):
-    db = open(apps_json, mode="r")
-    db_data = json.load(db)
-    db.close()
-    repo = db_data[0][name][0]["repository"]
-    branch = db_data[0][name][0]["branch"]
-    remote = db_data[0][name][0]["remote"]
-    return [repo, branch, remote]
-
-
-def get_total():
-    app_list = []
-    db_data = json.load(open(apps_json, mode="r"))
-    total = len(db_data)
-    for item in total:
-        app_list.append(db_data[item - 1]["app"])
-    return [app_list, total]
+    for item in db_data:
+        if item["app"] == name:
+            repo = item[name][0]["repository"]
+            branch = item[name][0]["branch"]
+            remote = item[name][0]["remote"]
+            return (repo, branch, remote)
+        else:
+            continue
 
 
 def get_tag(repo):
     gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
-    latest_tag = json.load(urllib.request.urlopen(gh_tag))
-    latest_tag = latest_tag["tag_name"]
+    latest_tag = requests.get(gh_tag).json()["tag_name"]
     return latest_tag
 
 
@@ -163,7 +151,6 @@ def dl_gh_source(name, repo):
     latest_tag = get_tag(repo)
     tarball_name = os.path.join(working_dir, f"{name}.tar.gz")
     gh_dl = f"https://github.com/{repo}/archive/{latest_tag}.tar.gz"
-    urllib.request.urlretrieve(gh_dl, tarball_name)
 
     tarball = requests.get(gh_dl, stream=True)
     tarball.raise_for_status()
@@ -182,54 +169,67 @@ def dl_gh_source(name, repo):
     os.chdir(root_dir)
 
 
-def dl_gitlab_source(name, repo, branch):
+def clone(name, repo, branch, remote):
+    if remote == "gitlab":
+        clone_url = "git://gitlab.com" + repo
+    elif remote == "bitbucket":
+        clone_url = "git://bitbucket.com" + repo
+    elif remote == "other":
+        clone_url = repo
+
+    latest_tag = get_tag(repo)
     app_working_dir = os.path.join(working_dir, f"{name}-{latest_tag}")
-    clonecmd = (
-        f"git clone git://gitlab.com/{repo} -b {branch} --depth 1 {app_working_dir}"
-    )
+    clonecmd = f"git clone {clone_url} -b {branch} --depth 1 {app_working_dir}"
     os.system(clonecmd)
 
 
-def build(name):
+def build(single, name, repo="", branch="", remote=""):
     setup()
 
     print(f"Fetching {name} information from db...\n")
 
-    repo = get_info_from_json(name)[0]
-    branch = get_info_from_json(name)[1]
-    remote = get_info_from_json(name)[2]
-    latest_tag = get_tag(repo).replace("v", "", 1)
-    app_working_dir = os.path.join(working_dir, f"{name}-{latest_tag}")
+    if single:
+        repo, branch, remote = get_info_from_json(name)
 
     if remote == "github":
         print("Download source from GitHub...\n")
         dl_gh_source(name, repo)
     elif remote == "gitlab":
         print("Download source from Gitlab...\n")
-        dl_gitlab_source(name, repo, branch)
+        clone(name, repo, branch, remote)
 
-    print(f"Building {name}...")
+    print(f"Building {name}...\n")
 
+    app_working_dir = os.path.join(working_dir, os.listdir(working_dir)[0])
     os.chdir(app_working_dir)
-    subprocess.check_call(shlex.split("./gradlew clean build"))
-    copy_build(name)
-
+    try:
+        subprocess.check_call(shlex.split("./gradlew clean build"))
+        copy_build(name)
+    except:
+        if single:
+            print(f"Build failed for {name}, exiting...\n")
 
 def copy_build(name):
+    latest_tag = get_tag()
     date = datetime.date.today()
-    app_out_dir = f"{out_dir}/{name}-{date}"
-    unsigned_apk_name = f"{name}-{date}-unsigned.apk"
+    app_out_dir = os.path.join(out_dir, f"{name}-{tag}-{date}")
+    unsigned_apk_name = f"{name}-{latest_tag}-{date}-unsigned.apk"
     dest = os.path.join(app_out_dir, unsigned_apk_name)
     os.mkdir(app_out_dir)
     releaseapk = str(list(pathlib.Path(working_dir).rglob("*release*.apk"))[0])
-    print(releaseapk)
     shutil.copyfile(releaseapk, dest)
 
 
 def build_all():
-    for app in get_total()[0]:
-        print(f"Build {app}")
-        build(app)
+    for item in db_data:
+        name = item["app"]
+        repo = item[name][0]["repository"]
+        branch = item[name][0]["branch"]
+        remote = item[name][0]["remote"]
+        try:
+            build(False, name, repo, branch, remote)
+        except:
+            print(f"Build failed for {name}, continuing...")
 
 
 def main():
@@ -238,16 +238,16 @@ def main():
         parse_arguments().print_usage()
         sys.exit(1)
     else:
-        if args.add_app and args.fdroid and args.from_file:
-            for apps in args.from_file:
-                info_from_fdroid(apps)
-        elif args.add_app and args.fdroid:
-            info_from_fdroid(args.add_app)
-        elif args.add_app:
-            info_from_user()
+        # if args.add_app and args.fdroid and args.from_file:
+        #     for apps in args.from_file:
+        #         info_from_fdroid(apps)
+        # elif args.add_app and args.fdroid:
+        #     info_from_fdroid(args.add_app)
+        # elif args.add_app:
+        #     info_from_user()
 
         if args.build is not None:
-            build(args.build)
+            build(True, args.build)
 
         if args.build_all is not False:
             build_all()
