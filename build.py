@@ -45,8 +45,7 @@ def parse_arguments():
     parser.add_argument(
         "--add-app",
         type=str,
-        nargs="?",
-        default=None,
+        default="",
         help="Takes application specifics input form user and stores in a JSON file",
     )
     parser.add_argument(
@@ -105,6 +104,14 @@ def check_net():
         return False
 
 
+def info_from_user():
+    if args.add_app == "":
+        url = input("Please enter repository URL: ").strip()
+    else:
+        url = args.add_app.strip()
+    url_parser(url)
+
+
 def from_file():
     f = os.path.join(os.getcwd(), args.from_file)
     if os.path.isfile(f) == False:
@@ -118,20 +125,16 @@ def from_file():
 
 
 def url_parser(url, loop=False):
-    url = url.strip()
-    base = url[::-1].replace("/", "", 1)[::-1]
     url = urlparse(url)
 
     if url.netloc == "":
-        # When URL doesn't have https:// urlparse considers domain to be a part of the path
-        # Therefore, when url.netlock is empty, delete domain from string
         name = (
             url.path.replace("/", "", 1)[::-1].replace("/", "", 1)[::-1]
             if (url.path.replace("/", "", 1)[-1] == "/")
             else url.path.replace("/", "", 1)
         ).split("/")[1]
+        repo = url.path.replace("github.com/", "")
         remote = url.path.split("/")[0].replace(".com", "")
-        repo = base.split("/")[1] + base.split("/")[2]
     else:
         name = (
             url.path.replace("/", "", 1)[::-1].replace("/", "", 1)[::-1]
@@ -205,10 +208,10 @@ def parse_to_json(name, repo, branch, remote="github"):
             db_data.append(new_app)
             db.write(json.dumps(db_data, indent=2))
     else:
-        db = open(apps_json, mode="w", encoding="utf-8")
-        final_list = [new_app]
-        db.write(json.dumps(final_list, indent=2))
-        db.close()
+        with open(apps_json, "w", encoding="utf-8") as db:
+            final_list = [new_app]
+            db.write(json.dumps(final_list, indent=2))
+            db.close()
 
 
 def get_info_from_json(name):
@@ -332,12 +335,15 @@ def main():
         parse_arguments().print_usage()
         sys.exit(1)
     else:
-
-        if args.add_app:
-            url_parser(args.add_app)
-
-        if bool(args.from_file):
+        if args.add_app and args.fdroid and args.from_file:
+            for app in args.from_file:
+                info_from_fdroid(app)
+        elif args.add_app and args.fdroid:
+            info_from_fdroid(args.add_app)
+        elif args.add_app and args.from_file != None:
             from_file()
+        elif args.add_app:
+            info_from_user()
 
         if args.build is not None:
             build(True, args.build)
