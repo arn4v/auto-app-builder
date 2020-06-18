@@ -44,7 +44,8 @@ def parse_arguments():
     )
     parser.add_argument(
         "--add-app",
-        action="store_true",
+        type=str,
+        default="",
         help="Takes application specifics input form user and stores in a JSON file",
     )
     parser.add_argument(
@@ -104,7 +105,10 @@ def check_net():
 
 
 def info_from_user():
-    url = input("Please enter repository URL: ").strip()
+    if args.add_app == "":
+        url = input("Please enter repository URL: ").strip()
+    else:
+        url = args.add_app.strip()
     url_parser(url)
 
 
@@ -122,6 +126,7 @@ def from_file():
 
 def url_parser(url, loop=False):
     url = urlparse(url)
+
     if url.netloc == "":
         name = (
             url.path.replace("/", "", 1)[::-1].replace("/", "", 1)[::-1]
@@ -143,26 +148,35 @@ def url_parser(url, loop=False):
         )
         remote = url.netloc.replace(" ", "").replace(".com", "")
 
-    if remote == "github":
-        try:
-            gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
-            branch = requests.get(gh_tag).json()["target_commitish"]
-        except:
-            print("Unable to fetch default branch from GitHub, defaulting to master...")
-            branch = "master"
-    else:
-        if loop == False:
-            branch = input("Please enter target branch: (Default = master) ")
-
-            if branch == "":
-                branch = "master"
+    if os.path.isfile(apps_json):
+        db = open(apps_json, mode="r", encoding="utf-8")
+        db_data = json.load(db)
+        db.close()
+        if db_data[0]["app"] == name:
+            print(f"{name} already exists")
         else:
-            branch = "master"
+            if remote == "github":
+                try:
+                    gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
+                    branch = requests.get(gh_tag).json()["target_commitish"]
+                except:
+                    print(
+                        "Unable to fetch default branch from GitHub, defaulting to master..."
+                    )
+                    branch = "master"
+            else:
+                if loop == False:
+                    branch = input("Please enter target branch: (Default = master) ")
 
-    if remote != "github":
-        parse_to_json(name, repo, branch, remote)
-    else:
-        parse_to_json(name, repo, branch)
+                    if branch == "":
+                        branch = "master"
+                else:
+                    branch = "master"
+
+            if remote != "github":
+                parse_to_json(name, repo, branch, remote)
+            else:
+                parse_to_json(name, repo, branch)
 
 
 # TODO: Use Selenium To Fetch Info From F-Droid
@@ -184,15 +198,15 @@ def parse_to_json(name, repo, branch, remote="github"):
     new_app[f"{name}"] = attrs_list
 
     if os.path.isfile(apps_json):
-            db = open(apps_json, mode="r", encoding="utf-8")
-            db_data = json.load(db)
-            db.close()
-            if db_data[0]["app"] == name:
-                print(f"{name} already exists")
-            else:
-                db = open(apps_json, mode="w", encoding="utf-8")
-                db_data.append(new_app)
-                db.write(json.dumps(db_data, indent=2))
+        db = open(apps_json, mode="r", encoding="utf-8")
+        db_data = json.load(db)
+        db.close()
+        if db_data[0]["app"] == name:
+            print(f"{name} already exists")
+        else:
+            db = open(apps_json, mode="w", encoding="utf-8")
+            db_data.append(new_app)
+            db.write(json.dumps(db_data, indent=2))
     else:
         with open(apps_json, "w", encoding="utf-8") as db:
             final_list = [new_app]
