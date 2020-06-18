@@ -3,3 +3,4 @@ working/*
 out/*
 tags.json
 apps.json
+*.txt

@@ -23,6 +23,16 @@ bin_dir = os.path.join(root_dir, "bin")
 out_dir = os.path.join(root_dir, "out")
 apps_json = os.path.join(root_dir, "apps.json")
 
+if os.path.isfile(apps_json) and os.stat(apps_json).st_size != 0:
+    db = open(apps_json, "r")
+    db_data = json.load(db)
+    db.close()
+elif os.path.isfile(apps_json) and os.stat(apps_json).st_size == 0:
+    os.remove(apps_json)
+    open(apps_json, "x")
+elif os.path.isfile(apps_json) == False:
+    open(apps_json, "x")
+
 
 def parse_arguments():
     """
@@ -38,6 +48,9 @@ def parse_arguments():
         "--build-all", action="store_true", help="Builds all app specified in json",
     )
     parser.add_argument(
+        "--list-all", action="store_true", help="Lists all apps in json",
+    )
+    parser.add_argument(
         "--fdroid",
         action="store_true",
         help="Takes application specifics input form user and stores in a JSON file",
@@ -45,11 +58,12 @@ def parse_arguments():
     parser.add_argument(
         "--add-app",
         type=str,
-        default="",
+        nargs="?",
+        const="",
         help="Takes application specifics input form user and stores in a JSON file",
     )
     parser.add_argument(
-        "--from-file",
+        "--file",
         metavar="LOCAL_FILE",
         type=str,
         help="Takes application names from text file, finds specifics from F-Droid and stores it in a new or prexisting JSON file.",
@@ -75,10 +89,7 @@ def setup():
     if os.path.isdir(bin_dir) == False:
         os.mkdir(bin_dir)
 
-    if os.path.isdir(out_dir):
-        shutil.rmtree(out_dir)
-        os.mkdir(out_dir)
-    else:
+    if os.path.isdir(out_dir) == False:
         os.mkdir(out_dir)
 
 
@@ -104,16 +115,16 @@ def check_net():
         return False
 
 
-def info_from_user():
-    if args.add_app == "":
+def info_from_user(url=""):
+    if url == "":
         url = input("Please enter repository URL: ").strip()
     else:
-        url = args.add_app.strip()
+        url = url.strip()
     url_parser(url)
 
 
-def from_file():
-    f = os.path.join(os.getcwd(), args.from_file)
+def from_file(f):
+    f = os.path.join(os.getcwd(), f)
     if os.path.isfile(f) == False:
         print("Specified file doesn't exist, exiting...")
         sys.exit()
@@ -129,18 +140,26 @@ def url_parser(url, loop=False):
 
     if url.netloc == "":
         name = (
-            url.path.replace("/", "", 1)[::-1].replace("/", "", 1)[::-1]
-            if (url.path.replace("/", "", 1)[-1] == "/")
-            else url.path.replace("/", "", 1)
-        ).split("/")[1]
+            (
+                url.path.replace("/", "", 1)[::-1].replace("/", "", 1)[::-1]
+                if (url.path.replace("/", "", 1)[-1] == "/")
+                else url.path.replace("/", "", 1)
+            )
+            .split("/")[1]
+            .lower()
+        )
         repo = url.path.replace("github.com/", "")
         remote = url.path.split("/")[0].replace(".com", "")
     else:
         name = (
-            url.path.replace("/", "", 1)[::-1].replace("/", "", 1)[::-1]
-            if (url.path.replace("/", "", 1)[-1] == "/")
-            else url.path.replace("/", "", 1)
-        ).split("/")[1]
+            (
+                url.path.replace("/", "", 1)[::-1].replace("/", "", 1)[::-1]
+                if (url.path.replace("/", "", 1)[-1] == "/")
+                else url.path.replace("/", "", 1)
+            )
+            .split("/")[1]
+            .lower()
+        )
         repo = (
             url.path.replace("/", "", 1)[::-1].replace("/", "", 1)[::-1]
             if (url.path.replace("/", "", 1)[-1] == "/")
@@ -148,26 +167,9 @@ def url_parser(url, loop=False):
         )
         remote = url.netloc.replace(" ", "").replace(".com", "")
 
-    if remote == "github":
-        try:
-            gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
-            branch = requests.get(gh_tag).json()["target_commitish"]
-        except:
-            print("Unable to fetch default branch from GitHub, defaulting to master...")
-            branch = "master"
-    else:
-        if loop == False:
-            branch = input("Please enter target branch: (Default = master) ")
+    branch = "master"
 
-            if branch == "":
-                branch = "master"
-        else:
-            branch = "master"
-
-    if remote != "github":
-        parse_to_json(name, repo, branch, remote)
-    else:
-        parse_to_json(name, repo, branch)
+    parse_to_json(name, repo, branch)
 
 
 # TODO: Use Selenium To Fetch Info From F-Droid
@@ -188,28 +190,25 @@ def parse_to_json(name, repo, branch, remote="github"):
     attrs_list.append(attrs_dict)
     new_app[f"{name}"] = attrs_list
 
-    if os.path.isfile(apps_json) and os.path.getsize(apps_json) != 0:
-        db = open(apps_json, mode="r", encoding="utf-8")
-        db_data = json.load(db)
-        db.close()
-        if db_data[0]["app"] == name:
-            print(f"{name} already exists")
-        else:
-            db = open(apps_json, mode="w", encoding="utf-8")
+    if os.path.isfile(apps_json) and os.stat(apps_json).st_size != 0:
+        apps = []
+
+        for item in db_data:
+            apps.append(item["app"])
+
+        if name not in apps:
+            db = open(apps_json, "w")
             db_data.append(new_app)
             db.write(json.dumps(db_data, indent=2))
+        else:
+            print(f"{name} already exists in db")
     else:
-        with open(apps_json, "w", encoding="utf-8") as db:
+        with open(apps_json, "w") as db:
             final_list = [new_app]
             db.write(json.dumps(final_list, indent=2))
-            db.close()
 
 
 def get_info_from_json(name):
-
-    db = open(apps_json, mode="r")
-    db_data = json.load(db)
-    db.close()
     for item in db_data:
         if item["app"] == name:
             repo = item[name][0]["repository"]
@@ -230,13 +229,13 @@ def dl_gh_source(name, repo, latest_tag):
     tarball_name = os.path.join(working_dir, f"{name}.tar.gz")
     gh_dl = f"https://github.com/{repo}/archive/{latest_tag}.tar.gz"
 
-    tarball = requests.get(gh_dl, stream=True)
+    tarball = requests.get(gh_dl)
     tarball.raise_for_status()
 
     with open(tarball_name, "wb") as handle:
         for block in tarball.iter_content(1024):
             handle.write(block)
-            handle.close()
+        handle.close()
 
     shutil.unpack_archive(
         filename=f"{working_dir}/{name}.tar.gz",
@@ -266,38 +265,42 @@ def build(single, name, repo="", branch="", remote=""):
     setup()
 
     print(f"Fetching {name} information from db...\n")
-
     if single:
         repo, branch, remote = get_info_from_json(name)
 
     latest_tag = get_tag(repo)
+    app_out_dir = os.path.join(out_dir, f"{name}-{latest_tag}")
 
-    if remote == "github":
-        print("Download source from GitHub...\n")
-        dl_gh_source(name, repo, latest_tag)
-    elif remote == "gitlab":
-        print("Download source from Gitlab...\n")
-        clone(name, repo, branch, remote)
-
-    print(f"Building {name}...\n")
-
-    app_working_dir = os.path.join(working_dir, os.listdir(working_dir)[0])
-
-    os.chdir(app_working_dir)
     try:
-        subprocess.check_call(shlex.split("./gradlew clean build"))
-        apk_loc = copy_build(name, latest_tag)
-        if single:
-            print(f"Build successful for {name}\n Find APK at {apk_loc}")
+        if len(os.listdir(app_out_dir)) > 0:
+            print(f"Already built {name}, skipping...\n")
     except:
-        if single:
-            print(f"Build failed for {name}, exiting...\n")
+        if remote == "github":
+            print("Download source from GitHub...\n")
+            dl_gh_source(name, repo, latest_tag)
+        elif remote == "gitlab":
+            print("Download source from Gitlab...\n")
+            clone(name, repo, branch, remote)
+
+        app_working_dir = os.path.join(working_dir, os.listdir(working_dir)[0])
+
+        os.chdir(app_working_dir)
+
+        print(f"Building {name}...\n")
+        try:
+            subprocess.check_call(shlex.split("./gradlew clean build"))
+            apk_loc = copy_build(name, latest_tag)
+            if single:
+                print(f"Build successful for {name}\nFind APK at {apk_loc}")
+        except:
+            if single:
+                print(f"Build failed for {name}, exiting...\n")
 
 
 def copy_build(name, latest_tag):
     date = datetime.date.today()
-    app_out_dir = os.path.join(out_dir, f"{name}-{latest_tag}-{date}")
-    unsigned_apk_name = f"{name}-{latest_tag}-{date}-unsigned.apk"
+    app_out_dir = os.path.join(out_dir, f"{name}-{latest_tag}")
+    unsigned_apk_name = f"{name}-{latest_tag}-unsigned.apk"
     dest = os.path.join(app_out_dir, unsigned_apk_name)
     os.mkdir(app_out_dir)
     releaseapk = str(list(pathlib.Path(working_dir).rglob("*release*.apk"))[0])
@@ -305,10 +308,13 @@ def copy_build(name, latest_tag):
     return dest
 
 
+def list_all():
+    for item in db_data:
+        name = item["app"]
+        print(name)
+
+
 def build_all():
-    db = open(apps_json, mode="r")
-    db_data = json.load(db)
-    db.close()
 
     for item in db_data:
         name = item["app"]
@@ -331,10 +337,16 @@ def main():
                 info_from_fdroid(app)
         elif args.add_app and args.fdroid:
             info_from_fdroid(args.add_app)
-        elif args.add_app and args.from_file != None:
-            from_file()
-        elif args.add_app:
-            info_from_user()
+        elif args.add_app == "" and args.file != None:
+            from_file(args.file)
+        elif len(args.add_app) == 0 or args.add_app != 0:
+            if len(args.add_app) > 0:
+                info_from_user(args.add_app)
+            else:
+                info_from_user()
+
+        if args.list_all == True:
+            list_all()
 
         if args.build is not None:
             build(True, args.build)
