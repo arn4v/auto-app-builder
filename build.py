@@ -147,8 +147,7 @@ def get_tag(repo):
     return latest_tag
 
 
-def dl_gh_source(name, repo):
-    latest_tag = get_tag(repo)
+def dl_gh_source(name, repo, latest_tag):
     tarball_name = os.path.join(working_dir, f"{name}.tar.gz")
     gh_dl = f"https://github.com/{repo}/archive/{latest_tag}.tar.gz"
 
@@ -191,9 +190,11 @@ def build(single, name, repo="", branch="", remote=""):
     if single:
         repo, branch, remote = get_info_from_json(name)
 
+    latest_tag = get_tag(repo)
+
     if remote == "github":
         print("Download source from GitHub...\n")
-        dl_gh_source(name, repo)
+        dl_gh_source(name, repo, latest_tag)
     elif remote == "gitlab":
         print("Download source from Gitlab...\n")
         clone(name, repo, branch, remote)
@@ -201,24 +202,25 @@ def build(single, name, repo="", branch="", remote=""):
     print(f"Building {name}...\n")
 
     app_working_dir = os.path.join(working_dir, os.listdir(working_dir)[0])
+
     os.chdir(app_working_dir)
     try:
         subprocess.check_call(shlex.split("./gradlew clean build"))
-        copy_build(name)
+        apk_loc = copy_build(name, latest_tag)
+        if single: print(f"Build successful for {name}\n Find APK at {apk_loc}")
     except:
-        if single:
-            print(f"Build failed for {name}, exiting...\n")
+        if single: print(f"Build failed for {name}, exiting...\n")
 
-def copy_build(name):
-    latest_tag = get_tag()
+
+def copy_build(name, latest_tag):
     date = datetime.date.today()
-    app_out_dir = os.path.join(out_dir, f"{name}-{tag}-{date}")
+    app_out_dir = os.path.join(out_dir, f"{name}-{latest_tag}-{date}")
     unsigned_apk_name = f"{name}-{latest_tag}-{date}-unsigned.apk"
     dest = os.path.join(app_out_dir, unsigned_apk_name)
     os.mkdir(app_out_dir)
     releaseapk = str(list(pathlib.Path(working_dir).rglob("*release*.apk"))[0])
     shutil.copyfile(releaseapk, dest)
-
+    return dest
 
 def build_all():
     for item in db_data:
@@ -229,7 +231,7 @@ def build_all():
         try:
             build(False, name, repo, branch, remote)
         except:
-            print(f"Build failed for {name}, continuing...")
+            print(f"Build failed for {name}, continuing...\n")
 
 
 def main():
