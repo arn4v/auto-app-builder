@@ -148,35 +148,26 @@ def url_parser(url, loop=False):
         )
         remote = url.netloc.replace(" ", "").replace(".com", "")
 
-    if os.path.isfile(apps_json):
-        db = open(apps_json, mode="r", encoding="utf-8")
-        db_data = json.load(db)
-        db.close()
-        if db_data[0]["app"] == name:
-            print(f"{name} already exists")
+    if remote == "github":
+        try:
+            gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
+            branch = requests.get(gh_tag).json()["target_commitish"]
+        except:
+            print("Unable to fetch default branch from GitHub, defaulting to master...")
+            branch = "master"
+    else:
+        if loop == False:
+            branch = input("Please enter target branch: (Default = master) ")
+
+            if branch == "":
+                branch = "master"
         else:
-            if remote == "github":
-                try:
-                    gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
-                    branch = requests.get(gh_tag).json()["target_commitish"]
-                except:
-                    print(
-                        "Unable to fetch default branch from GitHub, defaulting to master..."
-                    )
-                    branch = "master"
-            else:
-                if loop == False:
-                    branch = input("Please enter target branch: (Default = master) ")
+            branch = "master"
 
-                    if branch == "":
-                        branch = "master"
-                else:
-                    branch = "master"
-
-            if remote != "github":
-                parse_to_json(name, repo, branch, remote)
-            else:
-                parse_to_json(name, repo, branch)
+    if remote != "github":
+        parse_to_json(name, repo, branch, remote)
+    else:
+        parse_to_json(name, repo, branch)
 
 
 # TODO: Use Selenium To Fetch Info From F-Droid
@@ -197,7 +188,7 @@ def parse_to_json(name, repo, branch, remote="github"):
     attrs_list.append(attrs_dict)
     new_app[f"{name}"] = attrs_list
 
-    if os.path.isfile(apps_json):
+    if os.path.isfile(apps_json) and os.path.getsize(apps_json) != 0:
         db = open(apps_json, mode="r", encoding="utf-8")
         db_data = json.load(db)
         db.close()
