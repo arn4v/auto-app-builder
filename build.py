@@ -49,12 +49,15 @@ def parse_arguments():
     )
     parser.add_argument(
         "--from-file",
-        metavar="FILE",
-        type=argparse.FileType("r"),
+        metavar="LOCAL_FILE",
+        type=str,
         help="Takes application names from text file, finds specifics from F-Droid and stores it in a new or prexisting JSON file.",
     )
     parser.add_argument("--clean", action="store_false", help="Clean out directory.")
     return parser
+
+
+args = parse_arguments().parse_args()
 
 
 def setup():
@@ -102,6 +105,22 @@ def check_net():
 
 def info_from_user():
     url = input("Please enter repository URL: ").strip()
+    url_parser(url)
+
+
+def from_file():
+    f = os.path.join(os.getcwd(), args.from_file)
+    if os.path.isfile(f) == False:
+        print("Specified file doesn't exist, exiting...")
+        sys.exit()
+
+    app_list = open(f, "r").readlines()
+    for app in app_list:
+        app = app.strip()
+        url_parser(app, True)
+
+
+def url_parser(url, loop=False):
     url = urlparse(url)
     if url.netloc == "":
         name = (
@@ -125,12 +144,19 @@ def info_from_user():
         remote = url.netloc.replace(" ", "").replace(".com", "")
 
     if remote == "github":
-        gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
-        branch = requests.get(gh_tag).json()["target_commitish"]
+        try:
+            gh_tag = f"https://api.github.com/repos/{repo}/releases/latest"
+            branch = requests.get(gh_tag).json()["target_commitish"]
+        except:
+            print("Unable to fetch default branch from GitHub, defaulting to master...")
+            branch = "master"
     else:
-        branch = input("Please enter target branch: (Default = master) ")
+        if loop == False:
+            branch = input("Please enter target branch: (Default = master) ")
 
-        if branch == "":
+            if branch == "":
+                branch = "master"
+        else:
             branch = "master"
 
     if remote != "github":
@@ -145,34 +171,37 @@ def info_from_fdroid(name):
 
 
 def parse_to_json(name, repo, branch, remote="github"):
+    new_app = dict()
     attrs_list = list()
     attrs_dict = dict()
-    new_app = dict()
+
     new_app["app"] = name
     attrs_dict["repository"] = repo
     attrs_dict["branch"] = branch
     attrs_dict["remote"] = remote
+
     attrs_list.append(attrs_dict)
     new_app[f"{name}"] = attrs_list
-    final_list = [new_app]
-    if os.path.isfile(apps_json) == False:
-        with open(apps_json, "w", encoding="utf-8") as db:
-            db.write(json.dumps(final_list, indent=2))
+
+    if os.path.isfile(apps_json):
+            db = open(apps_json, mode="r", encoding="utf-8")
+            db_data = json.load(db)
             db.close()
-    else:
-        db = open(apps_json, mode="r")
-        db_data = json.load(db)
-        db.close()
-        for item in db_data:
-            if item["app"] == name:
+            if db_data[0]["app"] == name:
                 print(f"{name} already exists")
             else:
-                with open(apps_json, "w", encoding="utf-8") as db:
-                    db.write(json.dumps(final_list, indent=2))
-                    db.close()
+                db = open(apps_json, mode="w", encoding="utf-8")
+                db_data.append(new_app)
+                db.write(json.dumps(db_data, indent=2))
+    else:
+        with open(apps_json, "w", encoding="utf-8") as db:
+            final_list = [new_app]
+            db.write(json.dumps(final_list, indent=2))
+            db.close()
 
 
 def get_info_from_json(name):
+
     db = open(apps_json, mode="r")
     db_data = json.load(db)
     db.close()
@@ -288,16 +317,17 @@ def build_all():
 
 
 def main():
-    args = parse_arguments().parse_args()
     if len(sys.argv) < 2:
         parse_arguments().print_usage()
         sys.exit(1)
     else:
         if args.add_app and args.fdroid and args.from_file:
-            for apps in args.from_file:
-                info_from_fdroid(apps)
+            for app in args.from_file:
+                info_from_fdroid(app)
         elif args.add_app and args.fdroid:
             info_from_fdroid(args.add_app)
+        elif args.add_app and args.from_file != None:
+            from_file()
         elif args.add_app:
             info_from_user()
 
