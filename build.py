@@ -28,10 +28,10 @@ def parse_arguments():
     parser.add_argument(
         "-b",
         "--build",
-        default=None,
         metavar="APP",
-        help="Builds specified app",
         type=str,
+        nargs="*",
+        help="Builds specified app",
     )
     parser.add_argument(
         "-ba",
@@ -46,12 +46,14 @@ def parse_arguments():
         "-a",
         "--add-app",
         type=str,
+        nargs="*",
         help="Takes application specifics input form user and stores in a JSON file",
     )
     parser.add_argument(
         "-rm",
         "--remove",
         type=str,
+        nargs="*",
         help="Takes application specifics input form user and stores in a JSON file",
     )
     parser.add_argument(
@@ -198,11 +200,12 @@ else:
                 apps.append(item["app"])
 
             if name not in apps:
+                print(f"Adding {name.capitalize()} to db")
                 db = open(apps_json, "w")
                 db_data.append(new_app)
                 db.write(json.dumps(db_data, indent=2))
             else:
-                print(f"{name} already exists in db")
+                print(f"{name.capitalize()} already exists in db")
         else:
             with open(apps_json, "w") as db:
                 final_list = [new_app]
@@ -224,6 +227,7 @@ else:
             print(name.capitalize() + " doesn't exist in db, exiting...")
 
     def get_info_from_json(name):
+        name = name.casefold()
         for item in db_data:
             if item["app"] == name:
                 repo = item[name][0]["repository"]
@@ -275,8 +279,8 @@ else:
     def build(single, name, repo="", branch="", remote=""):
         setup()
 
-        print(f"Fetching {name} information from db...\n")
         if single:
+            print(f"Fetching {name} information from db...\n")
             repo, branch, remote = get_info_from_json(name)
 
         latest_tag = get_tag(repo)
@@ -284,13 +288,12 @@ else:
 
         try:
             if len(os.listdir(app_out_dir)) > 0:
-                print(f"Already built {name}, skipping...\n")
+                print(f"Already built {name.capitalize()}, skipping...")
         except:
+            print(f"Downloading {name.capitalize()} source...\n")
             if remote == "github":
-                print("Download source from GitHub...\n")
                 dl_gh_source(name, repo, latest_tag)
             elif remote == "gitlab":
-                print("Download source from Gitlab...\n")
                 clone(name, repo, branch, remote)
 
             app_working_dir = os.path.join(working_dir, os.listdir(working_dir)[0])
@@ -336,19 +339,22 @@ else:
 
     def main():
         if args.add_app:
-            info_from_user(args.add_app)
+            for item in args.add_app:
+                info_from_user(item)
 
         if args.from_file:
             from_file(args.file)
 
         if args.remove:
-            rmapp(args.remove)
+            for item in args.remove:
+                rmapp(item)
 
         if args.list_all:
             list_all()
 
         if args.build:
-            build(True, args.build)
+            for item in args.build:
+                build(True, item)
 
         if args.build_all:
             build_all()
