@@ -93,6 +93,18 @@ else:
         """
         Check if working directory exists and create it if it doesn't
         """
+        if "ANDROID_SDK_ROOT" not in os.environ:
+            print("Set environment variable ANDROID_SDK_ROOT")
+            sys.exit()
+
+        if "ANDROID_HOME" not in os.environ:
+            print("Set environment variable ")
+            sys.exit()
+
+        if "JAVA_HOME" not in os.environ:
+            print("Set environment variable JAVA_HOME")
+            sys.exit()
+
         if os.path.isdir(working_dir):
             os.chmod(working_dir, 0o755)
             shutil.rmtree(working_dir)
@@ -117,7 +129,7 @@ else:
             """
             )
             print(warning)
-            sys.exit()
+            # sys.exit()
 
     def check_net():
         try:
@@ -302,10 +314,16 @@ else:
 
             print(f"Building {name}...\n")
             try:
-                subprocess.check_call(shlex.split("./gradlew clean build"))
+
+                if platform.system() == "Windows":
+                    subprocess.check_call(shlex.split("gradlew.bat clean build"))
+                else:
+                    subprocess.check_call(shlex.split("./gradlew clean build"))
+
                 apk_loc = copy_build(name, latest_tag)
                 if single:
                     print(f"Build successful for {name}\nFind APK at {apk_loc}")
+
             except:
                 if single:
                     print(f"Build failed for {name}, exiting...\n")
@@ -360,6 +378,8 @@ else:
             build_all()
 
     if __name__ == "__main__":
+        setup()
+
         check_platform()
 
         if check_net() == False:
