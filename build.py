@@ -51,11 +51,6 @@ def parse_arguments():
         "--list-all", action="store_true", help="Lists all apps in json",
     )
     parser.add_argument(
-        "--fdroid",
-        action="store_true",
-        help="Takes application specifics input form user and stores in a JSON file",
-    )
-    parser.add_argument(
         "--add-app",
         type=str,
         nargs="?",
@@ -170,11 +165,6 @@ def url_parser(url, loop=False):
     branch = "master"
 
     parse_to_json(name, repo, branch)
-
-
-# TODO: Use Selenium To Fetch Info From F-Droid
-def info_from_fdroid(name):
-    return "This will eventually fetch relevant information from F-Droid."
 
 
 def parse_to_json(name, repo, branch, remote="github"):
@@ -332,12 +322,7 @@ def main():
         parse_arguments().print_usage()
         sys.exit(1)
     else:
-        if args.add_app and args.fdroid and args.from_file:
-            for app in args.from_file:
-                info_from_fdroid(app)
-        elif args.add_app and args.fdroid:
-            info_from_fdroid(args.add_app)
-        elif args.add_app == "" and args.file != None:
+        if args.add_app == "" and args.file != None:
             from_file(args.file)
         elif len(args.add_app) == 0 or args.add_app != 0:
             if len(args.add_app) > 0:
