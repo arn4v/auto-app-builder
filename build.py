@@ -242,9 +242,11 @@ else:
         name = name.casefold()
         for item in db_data:
             if item["app"] == name:
-                repo = item[name][0]["repository"]
-                branch = item[name][0]["branch"]
-                remote = item[name][0]["remote"]
+                repo, branch, remote = (
+                    item[name][0]["repository"],
+                    item[name][0]["branch"],
+                    item[name][0]["remote"],
+                )
                 return (repo, branch, remote)
             else:
                 continue
@@ -316,7 +318,9 @@ else:
             try:
 
                 if platform.system() == "Windows":
-                    subprocess.check_call(shlex.split("gradlew.bat clean build"))
+                    subprocess.check_call(
+                        shlex.split('cmd.exe /c "gradlew.bat clean build"')
+                    )
                 else:
                     subprocess.check_call(shlex.split("./gradlew clean build"))
 
@@ -346,10 +350,12 @@ else:
     def build_all():
 
         for item in db_data:
-            name = item["app"]
-            repo = item[name][0]["repository"]
-            branch = item[name][0]["branch"]
-            remote = item[name][0]["remote"]
+            name, repo, branch, remote = (
+                item["app"],
+                item[name][0]["repository"],
+                item[name][0]["branch"],
+                item[name][0]["remote"],
+            )
             try:
                 build(False, name, repo, branch, remote)
             except:
