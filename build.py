@@ -242,11 +242,9 @@ else:
         name = name.casefold()
         for item in db_data:
             if item["app"] == name:
-                repo, branch, remote = (
-                    item[name][0]["repository"],
-                    item[name][0]["branch"],
-                    item[name][0]["remote"],
-                )
+                repo = item[name][0]["repository"]
+                branch = item[name][0]["branch"]
+                remote = item[name][0]["remote"]
                 return (repo, branch, remote)
             else:
                 continue
@@ -350,12 +348,10 @@ else:
     def build_all():
 
         for item in db_data:
-            name, repo, branch, remote = (
-                item["app"],
-                item[name][0]["repository"],
-                item[name][0]["branch"],
-                item[name][0]["remote"],
-            )
+            name = item["app"]
+            repo = item[name][0]["repository"]
+            branch = item[name][0]["branch"]
+            remote = item[name][0]["remote"]
             try:
                 build(False, name, repo, branch, remote)
             except:
