@@ -63,6 +63,12 @@ def parse_arguments():
         type=str,
         help="Takes application names from text file, finds specifics from F-Droid and stores it in a new or prexisting JSON file.",
     )
+    parser.add_argument(
+        "-ns",
+        "--no-sign",
+        action="store_true",
+        help="Use if you don't want to sign built apps",
+    )
     parser.add_argument("--clean", action="store_false", help="Clean out directory.")
     return parser
 
@@ -78,6 +84,9 @@ else:
     bin_dir = os.path.join(root_dir, "bin")
     out_dir = os.path.join(root_dir, "out")
     apps_json = os.path.join(root_dir, "apps.json")
+    ks_folder = os.path.join(root_dir, "keystore")
+    ks_loc = os.path.join(ks_folder, "autoappbuilder.jks")
+    ks_conf = os.path.join(ks_folder, "ks.conf")
 
     if os.path.isfile(apps_json) and os.stat(apps_json).st_size != 0:
         db = open(apps_json, "r")
@@ -101,7 +110,7 @@ else:
             print("Set environment variable ")
             sys.exit()
 
-        if "JAVA_HOME" not in os.environ:
+        if type(shutil.which("java")) is None:
             print("Set environment variable JAVA_HOME")
             sys.exit()
 
@@ -316,29 +325,109 @@ else:
             try:
 
                 if platform.system() == "Windows":
-                    subprocess.check_call(
-                        shlex.split('cmd.exe /c "gradlew.bat clean build"')
+                    subprocess.run(
+                        shlex.split('cmd.exe /c "gradlew.bat clean build"'),
+                        capture_output=False,
                     )
                 else:
-                    subprocess.check_call(shlex.split("./gradlew clean build"))
+                    subprocess.run(
+                        shlex.split("./gradlew clean build"), capture_output=False
+                    )
 
-                apk_loc = copy_build(name, latest_tag)
-                if single:
-                    print(f"Build successful for {name}\nFind APK at {apk_loc}")
-
+                unsigned_apk_path = copy_build(name, latest_tag)
+                if not args.no_sign:
+                    signed_path = sign_build(unsigned_apk_path)
+                    print(f"\nBuild successful for {name}\nFind APK at {signed_path}")
+                else:
+                    print(
+                        f"\nBuild successful for {name}\nFind APK at {unsigned_apk_path}"
+                    )
             except:
-                if single:
+                if not single:
+                    print(f"Build failed for {name}, continuing...\n")
+                else:
                     print(f"Build failed for {name}, exiting...\n")
 
     def copy_build(name, latest_tag):
         date = datetime.date.today()
         app_out_dir = os.path.join(out_dir, f"{name}-{latest_tag}")
-        unsigned_apk_name = f"{name}-{latest_tag}-unsigned.apk"
-        dest = os.path.join(app_out_dir, unsigned_apk_name)
+        unsigned_apk_name = f"{name}-{latest_tag}-unsigned"
+        unsigned_apk_path = os.path.join(app_out_dir, f"{unsigned_apk_name}.apk")
         os.mkdir(app_out_dir)
         releaseapk = str(list(pathlib.Path(working_dir).rglob("*release*.apk"))[0])
-        shutil.copyfile(releaseapk, dest)
-        return dest
+        shutil.copyfile(releaseapk, unsigned_apk_path)
+        return unsigned_apk_path
+
+    def check_for_keystore():
+        global ks_conf
+
+        if not os.path.isdir(ks_folder):
+            os.mkdir(ks_folder)
+
+        os.chdir(ks_folder)
+
+        if os.path.isfile(ks_loc) == False or os.path.isfile(ks_conf) == False:
+            while True:
+                default_ks_pass = input("Password must be at least 6 characters: ")
+                if len(default_ks_pass) >= 6:
+                    break
+            default_ks_alias = "auto-app-builder"
+            print("Generating keystore\n")
+            subprocess.run(
+                shlex.split(
+                    f"keytool -genkey -v -keystore {ks_loc} -storepass {default_ks_pass} -keypass {default_ks_pass} -alias {default_ks_alias} -keyalg RSA -keysize 2048 -validity 10000"
+                )
+            )
+
+            ks_conf_dict = dict()
+            ks_conf_dict["ks_loc"] = ks_loc
+            ks_conf_dict["ks_pass"] = default_ks_pass
+            ks_conf_dict["ks_alias"] = default_ks_alias
+            ks_conf = open(ks_conf, "w")
+            ks_conf.write(json.dumps(ks_conf_dict, indent=2))
+            ks_conf.close()
+
+    def sign_build(unsigned_apk_path):
+        build_tools_dir = os.path.join(os.environ["ANDROID_HOME"], "build-tools")
+        latest_bt = os.listdir(build_tools_dir).pop()
+        latest_bt_path = os.path.join(build_tools_dir, latest_bt)
+        aligned_path = unsigned_apk_path.replace("unsigned", "unsigned-aligned")
+        signed_path = unsigned_apk_path.replace("unsigned", "signed")
+        check_for_keystore()
+        ks_data = json.load(open(ks_conf, "r"))
+        ks_loc = ks_data["ks_loc"]
+        ks_alias = ks_data["ks_alias"]
+        ks_pass = ks_data["ks_pass"]
+        if os.path.isfile(unsigned_apk_path):
+            if platform.system() == "Windows":
+                zipalign = os.path.join(latest_bt_path, "zipalign.exe")
+                apk_signer = os.path.join(latest_bt_path, "apksigner.bat")
+                subprocess.run(
+                    shlex.split(
+                        f'"{zipalign}"  -v -p 4 {unsigned_apk_path} {aligned_path}'
+                    )
+                )
+                subprocess.run(
+                    shlex.split(
+                        f'"{apk_signer}" sign --ks {ks_loc} --ks-pass pass:{ks_pass} --key-pass pass:{ks_pass} --ks-key-alias {ks_alias} --out {signed_path} {aligned_path}'
+                    )
+                )
+            else:
+                subprocess.run(
+                    shlex.split(
+                        f"{latest_bt_path}/zipalign  -v -p 4 {unsigned_apk_path} {aligned_path}"
+                    ),
+                    capture_output=False,
+                )
+                subprocess.run(
+                    shlex.split(
+                        f"{latest_bt_path}/apksigner sign --ks {ks_loc} --ks-pass pass:{ks_pass} --key-pass pass:{ks_pass} --ks-key-alias {ks_alias} --out {signed_path} {aligned_path}"
+                    ),
+                    capture_output=True,
+                )
+        os.remove(unsigned_apk_path)
+        os.remove(aligned_path)
+        return signed_path
 
     def list_all():
         for item in db_data:
@@ -352,10 +441,7 @@ else:
             repo = item[name][0]["repository"]
             branch = item[name][0]["branch"]
             remote = item[name][0]["remote"]
-            try:
-                build(False, name, repo, branch, remote)
-            except:
-                print(f"Build failed for {name}, continuing...\n")
+            build(False, name, repo, branch, remote)
 
     def main():
         if args.add_app:
@@ -374,6 +460,7 @@ else:
 
         if args.build:
             for item in args.build:
+                item = item.casefold()
                 build(True, item)
 
         if args.build_all:
