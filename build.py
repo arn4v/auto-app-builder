@@ -40,7 +40,7 @@ def parse_arguments():
         help="Builds all app specified in json",
     )
     parser.add_argument(
-        "-l", "--list-all", action="store_true", help="Lists all apps in json",
+        "-l", "--list", action="store_true", help="Lists all apps in json",
     )
     parser.add_argument(
         "-a",
@@ -443,6 +443,10 @@ else:
             remote = item[name][0]["remote"]
             build(False, name, repo, branch, remote)
 
+    def clean():
+        os.chmod(out_dir, 0o755)
+        shutil.rmtree(out_dir)
+
     def main():
         if args.add_app:
             for item in args.add_app:
@@ -455,13 +459,15 @@ else:
             for item in args.remove:
                 rmapp(item)
 
-        if args.list_all:
+        if args.list:
             list_all()
 
         if args.build:
             for item in args.build:
                 item = item.casefold()
                 build(True, item)
+        if args.clean:
+            clean()
 
         if args.build_all:
             build_all()
