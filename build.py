@@ -140,13 +140,6 @@ else:
             print(warning)
             # sys.exit()
 
-    def check_net():
-        try:
-            response = requests.get("https://www.google.com/", timeout=10)
-            return True
-        except:
-            return False
-
     def info_from_user(url=""):
         if url == "":
             url = input("Please enter repository URL: ").strip()
@@ -474,11 +467,5 @@ else:
 
     if __name__ == "__main__":
         setup()
-
         check_platform()
-
-        if check_net() == False:
-            print("Please check your internet connection and try again.")
-            sys.exit()
-
         main()
